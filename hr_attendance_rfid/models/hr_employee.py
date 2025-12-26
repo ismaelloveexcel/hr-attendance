@@ -33,7 +33,6 @@ class HrEmployeeBase(models.AbstractModel):
             'logged': boolean
             'action': check_in/check_out
         """
-
         res = {
             "rfid_card_code": card_code,
             "employee_name": "",
@@ -46,26 +45,18 @@ class HrEmployeeBase(models.AbstractModel):
         # hr.employee. Hr.employee.public model does not have the
         # _attendance_action_change() method that will be used later.
         employee = self.sudo().search([("rfid_card_code", "=", card_code)], limit=1)
-        if employee:
-            res["employee_name"] = employee.name
-            res["employee_id"] = employee.id
-        else:
+        if not employee:
             msg = self.env._("No employee found with card %s") % card_code
             _logger.warning(msg)
             res["error_message"] = msg
             return res
+
+        res["employee_name"] = employee.name
+        res["employee_id"] = employee.id
+
         try:
             attendance = employee._attendance_action_change()
-            if attendance:
-                msg = self.env._("Attendance recorded for employee %s") % employee.name
-                _logger.debug(msg)
-                res["logged"] = True
-                if attendance.check_out:
-                    res["action"] = "check_out"
-                else:
-                    res["action"] = "check_in"
-                return res
-            else:
+            if not attendance:
                 msg = (
                     self.env._("No attendance was recorded for employee %s")
                     % employee.name
@@ -73,6 +64,12 @@ class HrEmployeeBase(models.AbstractModel):
                 _logger.error(msg)
                 res["error_message"] = msg
                 return res
+
+            _logger.debug(
+                self.env._("Attendance recorded for employee %s"), employee.name
+            )
+            res["logged"] = True
+            res["action"] = "check_out" if attendance.check_out else "check_in"
         except Exception as e:
             res["error_message"] = repr(e)
             _logger.error(repr(e))
