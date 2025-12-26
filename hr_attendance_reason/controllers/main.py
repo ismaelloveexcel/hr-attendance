@@ -22,31 +22,29 @@ class HrAttendance(HrAttendance):
         response.update(self._get_attendance_reason_settings(company))
         # get available reasons for employee company
         reasons = []
-        if response.get("attendance_state", False):
-            if response.get("attendance_state", False) == "checked_out":
-                action_type = "sign_in"
-            else:
-                action_type = "sign_out"
+        attendance_state = response.get("attendance_state")
+        if attendance_state:
+            action_type = "sign_in" if attendance_state == "checked_out" else "sign_out"
             reasons = self._get_attendance_reasons(action_type, company)
-        response.update({"reasons": reasons})
+        response["reasons"] = reasons
         return response
+
+    def _set_attendance_reason_context(self):
+        """Helper to set attendance_reason_id in context from request params."""
+        reason_id = request.params.get("attendance_reason_id")
+        if reason_id:
+            request.update_context(attendance_reason_id=int(reason_id))
 
     @route("/hr_attendance/systray_check_in_out", type="json", auth="user")
     def systray_attendance(self, latitude=False, longitude=False):
-        if request.params.get("attendance_reason_id"):
-            request.update_context(
-                attendance_reason_id=int(request.params.get("attendance_reason_id"))
-            )
+        self._set_attendance_reason_context()
         return super().systray_attendance(latitude=latitude, longitude=longitude)
 
     @http.route("/hr_attendance/manual_selection", type="json", auth="public")
     def manual_selection_with_geolocation(
         self, token, employee_id, pin_code, latitude=False, longitude=False
     ):
-        if request.params.get("attendance_reason_id"):
-            request.update_context(
-                attendance_reason_id=int(request.params.get("attendance_reason_id"))
-            )
+        self._set_attendance_reason_context()
         return super().manual_selection_with_geolocation(
             token, employee_id, pin_code, latitude, longitude
         )
@@ -83,19 +81,19 @@ class HrAttendance(HrAttendance):
         return {}
 
     def _get_attendance_reason_settings(self, company):
-        show_reason = company.show_reason_on_attendance_screen
-        required_reason = company.required_reason_on_attendance_screen
-        default_sign_in_reason_id = (
-            company.reason_on_attendance_screen_default_sign_in.id
-        )
-        default_sign_out_reason_id = (
-            company.reason_on_attendance_screen_default_sign_out.id
-        )
         return {
-            "show_reason_on_attendance_screen": show_reason,
-            "required_reason_on_attendance_screen": required_reason,
-            "default_sign_in_reason_id": default_sign_in_reason_id,
-            "default_sign_out_reason_id": default_sign_out_reason_id,
+            "show_reason_on_attendance_screen": (
+                company.show_reason_on_attendance_screen
+            ),
+            "required_reason_on_attendance_screen": (
+                company.required_reason_on_attendance_screen
+            ),
+            "default_sign_in_reason_id": (
+                company.reason_on_attendance_screen_default_sign_in.id
+            ),
+            "default_sign_out_reason_id": (
+                company.reason_on_attendance_screen_default_sign_out.id
+            ),
         }
 
     def _get_attendance_reasons(self, action_type, company):
